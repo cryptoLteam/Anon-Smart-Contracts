@@ -3,14 +3,15 @@
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "hardhat/console.sol";
 
-contract StakingContract is Ownable, ReentrancyGuard {
+contract StakingContract is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
     IERC20 public rtoken;
     mapping(address => uint256) public rewardTokenPerDay;
+    mapping(address => bool) public allowedToStake;
 
     struct UserInfo {
         uint256[] tokenIds;
@@ -22,26 +23,21 @@ contract StakingContract is Ownable, ReentrancyGuard {
     event Stake(address indexed user, uint256 amount);
     event UnStake(address indexed user, uint256 amount);
 
-    constructor(
-        address _rTokenAddress, 
-        address _abstraction, 
-        uint256 _rewardsPerDayForAbstraction,
-        address _wiainitai, 
-        uint256 _rewardsPerDayForWiainitai,
-        address _koba, 
-        uint256 _rewardsPerDayForKoba
-    ) {
-        rtoken = IERC20(_rTokenAddress);
-        changeRewardTokenPerDay(_abstraction, _rewardsPerDayForAbstraction);
-        changeRewardTokenPerDay(_wiainitai, _rewardsPerDayForWiainitai);
-        changeRewardTokenPerDay(_koba, _rewardsPerDayForKoba);
+    function initialize() public initializer {
+        __Ownable_init();
+        __ReentrancyGuard_init();
     }
 
-    function changeRewardTokenAddress(address _rewardTokenAddress) public onlyOwner {
+    function setRewardTokenAddress(address _rewardTokenAddress) public onlyOwner {
         rtoken = IERC20(_rewardTokenAddress);
     }
 
-    function changeRewardTokenPerDay(address _collection, uint256 _rewardTokenPerDay) public onlyOwner {
+    function allowCollectionToStake(address _collection, bool _allow) public onlyOwner {
+        allowedToStake[_collection] = _allow;
+        if(!_allow) rewardTokenPerDay[_collection] = 0;
+    }
+
+    function setRewardTokenPerDay(address _collection, uint256 _rewardTokenPerDay) public onlyOwner {
         rewardTokenPerDay[_collection] = _rewardTokenPerDay;
     }
 
@@ -56,6 +52,7 @@ contract StakingContract is Ownable, ReentrancyGuard {
     }
 
     function stake(address _collection, uint256[] memory tokenIds) public nonReentrant {
+        require(allowedToStake[_collection], "Not allowed to stake for this collection");
         uint256 _pendingRewards = pendingReward(_collection, msg.sender);
         if(_pendingRewards > 0) {
             rtoken.transfer(msg.sender, _pendingRewards);
