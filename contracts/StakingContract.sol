@@ -5,20 +5,21 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "hardhat/console.sol";
 
 contract StakingContract is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
     IERC20 public rtoken;
-    mapping(address => uint256) public rewardTokenPerDay;
+    mapping(address => uint256) public rewardTokenPerBlock;
     mapping(address => bool) public allowedToStake;
 
     struct UserInfo {
-        uint256[] tokenIds;
-        uint256 startTime;
+        EnumerableSet.UintSet tokenIds;
+        uint256 startBlock;
     }
 
-    mapping(address => mapping(address => UserInfo)) public userInfo;
+    mapping(address => mapping(address => UserInfo)) userInfo;
 
     event Stake(address indexed user, uint256 amount);
     event UnStake(address indexed user, uint256 amount);
@@ -34,11 +35,11 @@ contract StakingContract is OwnableUpgradeable, ReentrancyGuardUpgradeable {
 
     function allowCollectionToStake(address _collection, bool _allow) public onlyOwner {
         allowedToStake[_collection] = _allow;
-        if(!_allow) rewardTokenPerDay[_collection] = 0;
+        if(!_allow) rewardTokenPerBlock[_collection] = 0;
     }
 
-    function setRewardTokenPerDay(address _collection, uint256 _rewardTokenPerDay) public onlyOwner {
-        rewardTokenPerDay[_collection] = _rewardTokenPerDay;
+    function setRewardTokenPerBlock(address _collection, uint256 _rewardTokenPerBlock) public onlyOwner {
+        rewardTokenPerBlock[_collection] = _rewardTokenPerBlock;
     }
 
     function approve(address tokenAddress, address spender, uint256 amount) public onlyOwner returns (bool) {
@@ -47,80 +48,81 @@ contract StakingContract is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     }
 
     function pendingReward(address _collection, address _user) public view returns (uint256) {
-        UserInfo memory _userInfo = userInfo[_collection][_user];
-        return _userInfo.tokenIds.length * (block.timestamp - _userInfo.startTime) / 1 days * rewardTokenPerDay[_collection];
+        UserInfo storage _userInfo = userInfo[_collection][_user];
+        return EnumerableSet.length(_userInfo.tokenIds) * (block.number - _userInfo.startBlock) * rewardTokenPerBlock[_collection];
     }
 
-    function stake(address _collection, uint256[] memory tokenIds) public nonReentrant {
+    function stake(address _collection, uint256[] calldata tokenIds) public nonReentrant {
         require(allowedToStake[_collection], "Not allowed to stake for this collection");
+        require(tokenIds.length > 0, "tokenIds parameter has zero length.");
         uint256 _pendingRewards = pendingReward(_collection, msg.sender);
         if(_pendingRewards > 0) {
-            rtoken.transfer(msg.sender, _pendingRewards);
+            require(rtoken.transfer(msg.sender, _pendingRewards), "Reward Token Transfer is failed.");
         }
-        userInfo[_collection][msg.sender].startTime = block.timestamp;
+        userInfo[_collection][msg.sender].startBlock = block.number;
 
         for(uint256 i = 0; i < tokenIds.length; i++) {
-            IERC721(_collection).transferFrom(address(msg.sender), address(this), tokenIds[i]);
-            userInfo[_collection][msg.sender].tokenIds.push(tokenIds[i]);
-            emit Stake(msg.sender, 1);
+            require(IERC721(_collection).ownerOf(tokenIds[i]) == msg.sender, "Not Your NFT.");
+            IERC721(_collection).transferFrom(msg.sender, address(this), tokenIds[i]);
+            EnumerableSet.add(userInfo[_collection][msg.sender].tokenIds, tokenIds[i]);
         }
+        emit Stake(msg.sender, tokenIds.length);
     }
 
-    function unStake(address _collection, uint256[] memory tokenIds) public nonReentrant {
+    function unStake(address _collection, uint256[] calldata tokenIds) public nonReentrant {
+        require(tokenIds.length > 0, "tokenIds parameter has zero length.");
         uint256 _pendingRewards = pendingReward(_collection, msg.sender);
         if(_pendingRewards > 0) {
-            rtoken.transfer(msg.sender, _pendingRewards);
+            require(rtoken.transfer(msg.sender, _pendingRewards), "Reward Token Transfer is failed.");
         }
-        userInfo[_collection][msg.sender].startTime = block.timestamp;
+
+        UserInfo storage _userInfo = userInfo[_collection][msg.sender];
+        _userInfo.startBlock = block.number;
 
         for(uint256 i = 0; i < tokenIds.length; i++) {
-            require(removeItem(_collection, msg.sender, tokenIds[i]), "Not your NFT id.");
+            require(EnumerableSet.remove(_userInfo.tokenIds, tokenIds[i]), "Not your NFT Id.");
             IERC721(_collection).transferFrom(address(this), msg.sender, tokenIds[i]);
-            emit UnStake(msg.sender, 1);
         }
+        emit UnStake(msg.sender, tokenIds.length);
     }
 
     function claimRewards(address _collection) public nonReentrant {
         uint256 _pendingRewards = pendingReward(_collection, msg.sender);
         if(_pendingRewards > 0) {
-            rtoken.transfer(msg.sender, _pendingRewards);
-            userInfo[_collection][msg.sender].startTime = block.timestamp;
+            require(rtoken.transfer(msg.sender, _pendingRewards), "Reward Token Transfer is failed.");
+            userInfo[_collection][msg.sender].startBlock = block.number;
         }
     }
 
-    function stakeAll(address[] memory _collection, uint256[][] memory tokenIds) public {
+    function stakeAll(address[] memory _collection, uint256[][] calldata tokenIds) public {
         for(uint256 i = 0; i < _collection.length; i++) {
             stake(_collection[i], tokenIds[i]);
         }
     }
 
-    function unStakeAll(address[] memory _collection, uint256[][] memory tokenIds) public {
+    function unStakeAll(address[] memory _collection, uint256[][] calldata tokenIds) public {
         for(uint256 i = 0; i < _collection.length; i++) {
             unStake(_collection[i], tokenIds[i]);
         }
     }
 
-    function claimRewardsAll(address[] memory _collection) public {
+    function claimRewardsAll(address[] calldata _collection) public {
         for(uint256 i = 0; i < _collection.length; i++) {
             claimRewards(_collection[i]);
         }
     }
 
-    function removeItem(address _collection, address _user, uint256 tokenId) private returns(bool){    
-        UserInfo storage _userInfo = userInfo[_collection][_user];    
-        for (uint256 i = 0; i < _userInfo.tokenIds.length; i++) {
-            if (_userInfo.tokenIds[i] == tokenId) {
-                _userInfo.tokenIds[i] = _userInfo.tokenIds[_userInfo.tokenIds.length - 1];
-                _userInfo.tokenIds.pop();
-                return true;
-            }
+    function emergencyWithdraw(address _collection) public {
+        UserInfo storage _userInfo = userInfo[_collection][msg.sender];
+        for(uint256 i = 0; i < EnumerableSet.length(_userInfo.tokenIds); i++) {
+            IERC721(_collection).transferFrom(address(this), msg.sender, EnumerableSet.at(_userInfo.tokenIds, i));
         }
-        return false;
+        emit UnStake(msg.sender, EnumerableSet.length(_userInfo.tokenIds));
     }
 
     function getStakingInfo(address _collection, address _user) public view returns(uint256[] memory, uint256) {
         return (
-            userInfo[_collection][_user].tokenIds,
+            EnumerableSet.values(userInfo[_collection][msg.sender].tokenIds),
             pendingReward(_collection, _user)
         );
     }
