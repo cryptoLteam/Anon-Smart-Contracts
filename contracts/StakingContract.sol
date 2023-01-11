@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "hardhat/console.sol";
 
 contract StakingContract is Ownable, ReentrancyGuard {
 
@@ -28,22 +27,21 @@ contract StakingContract is Ownable, ReentrancyGuard {
         rtoken = IERC20(_rToken);
     }
 
-    function setRewardTokenAddress(address _rewardTokenAddress) public onlyOwner {
+    function setRewardTokenAddress(address _rewardTokenAddress) external onlyOwner {
         rtoken = IERC20(_rewardTokenAddress);
     }
 
-    function allowCollectionToStake(address _collection, bool _allow) public onlyOwner {
+    function allowCollectionToStake(address _collection, bool _allow) external onlyOwner {
         allowedToStake[_collection] = _allow;
         if(!_allow) rewardTokenPerBlock[_collection] = 0;
     }
 
-    function setRewardTokenPerBlock(address _collection, uint256 _rewardTokenPerBlock) public onlyOwner {
+    function setRewardTokenPerBlock(address _collection, uint256 _rewardTokenPerBlock) external onlyOwner {
         rewardTokenPerBlock[_collection] = _rewardTokenPerBlock;
     }
 
-    function approve(address tokenAddress, address spender, uint256 amount) public onlyOwner returns (bool) {
-      IERC20(tokenAddress).approve(spender, amount);
-      return true;
+    function withdrawTokens() external onlyOwner {
+      rtoken.transfer(msg.sender, rtoken.balanceOf(address(this)));
     }
 
     function pendingReward(address _collection, address _user) public view returns (uint256) {
@@ -93,36 +91,40 @@ contract StakingContract is Ownable, ReentrancyGuard {
         }
     }
 
-    function stakeAll(address[] memory _collection, uint256[][] calldata tokenIds) public {
+    function stakeAll(address[] calldata _collection, uint256[][] calldata tokenIds) external {
         for(uint256 i = 0; i < _collection.length; i++) {
             stake(_collection[i], tokenIds[i]);
         }
     }
 
-    function unStakeAll(address[] memory _collection, uint256[][] calldata tokenIds) public {
+    function unStakeAll(address[] calldata _collection, uint256[][] calldata tokenIds) external {
         for(uint256 i = 0; i < _collection.length; i++) {
             unStake(_collection[i], tokenIds[i]);
         }
     }
 
-    function claimRewardsAll(address[] calldata _collection) public {
+    function claimRewardsAll(address[] calldata _collection) external {
         for(uint256 i = 0; i < _collection.length; i++) {
             claimRewards(_collection[i]);
         }
     }
 
-    function emergencyWithdraw(address _collection) public {
+    function emergencyWithdraw(address _collection) external {
         UserInfo storage _userInfo = userInfo[_collection][msg.sender];
+        require(EnumerableSet.length(_userInfo.tokenIds) > 0, "You have no tokens staked.");
         for(uint256 i = 0; i < EnumerableSet.length(_userInfo.tokenIds); i++) {
             IERC721(_collection).transferFrom(address(this), msg.sender, EnumerableSet.at(_userInfo.tokenIds, i));
         }
         emit UnStake(msg.sender, EnumerableSet.length(_userInfo.tokenIds));
     }
 
-    function getStakingInfo(address _collection, address _user) public view returns(uint256[] memory, uint256) {
-        return (
-            EnumerableSet.values(userInfo[_collection][msg.sender].tokenIds),
-            pendingReward(_collection, _user)
-        );
+    function getStakingInfo(address _collection, address _user) public view returns(uint256[] memory _tokenIds, uint256 _pendingRewards) {
+        UserInfo storage _userInfo = userInfo[_collection][_user];
+        uint256 length = EnumerableSet.length(_userInfo.tokenIds);
+        _tokenIds = new uint256[](length);
+        for(uint256 i = 0; i < length; i++) {
+            _tokenIds[i] = EnumerableSet.at(_userInfo.tokenIds, i);
+        }
+        _pendingRewards = pendingReward(_collection, _user);
     }
 }

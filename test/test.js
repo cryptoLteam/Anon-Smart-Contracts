@@ -46,8 +46,13 @@ describe("Test Token", async function () {
         // await anon.deployed();
         // console.log("anon address: ", anon.address)
 
+        // const StakingContract = await ethers.getContractFactory("StakingContract");
+        // staking = await upgrades.deployProxy(StakingContract, [], { initializer: 'initialize' } );
+        // await staking.deployed()
+        // console.log("staking address: ", staking.address)
+        
         const StakingContract = await ethers.getContractFactory("StakingContract");
-        staking = await upgrades.deployProxy(StakingContract, [], { initializer: 'initialize' } );
+        staking = await StakingContract.deploy(token.address)
         await staking.deployed()
         console.log("staking address: ", staking.address)
 
