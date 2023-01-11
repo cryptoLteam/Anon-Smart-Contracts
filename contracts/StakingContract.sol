@@ -3,12 +3,12 @@
 pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "hardhat/console.sol";
 
-contract StakingContract is OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract StakingContract is Ownable, ReentrancyGuard {
 
     IERC20 public rtoken;
     mapping(address => uint256) public rewardTokenPerBlock;
@@ -24,9 +24,8 @@ contract StakingContract is OwnableUpgradeable, ReentrancyGuardUpgradeable {
     event Stake(address indexed user, uint256 amount);
     event UnStake(address indexed user, uint256 amount);
 
-    function initialize() public initializer {
-        __Ownable_init();
-        __ReentrancyGuard_init();
+    constructor(address _rToken) {
+        rtoken = IERC20(_rToken);
     }
 
     function setRewardTokenAddress(address _rewardTokenAddress) public onlyOwner {

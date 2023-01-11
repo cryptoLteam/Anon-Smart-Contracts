@@ -11,7 +11,7 @@ require("@nomiclabs/hardhat-ethers");
 describe("Test Token", async function () {
     let owner, accounts;
     let teamWallet;
-    let register, token, presale, busd, marketplace, wbnb, anon;
+    let staking, token, presale, busd, marketplace, wbnb, anon;
     before(async () => {
         [owner, ...accounts] = await ethers.getSigners();
 
@@ -47,13 +47,8 @@ describe("Test Token", async function () {
         // console.log("anon address: ", anon.address)
 
         const StakingContract = await ethers.getContractFactory("StakingContract");
-        staking = await StakingContract.deploy(
-                token.address, 
-                abstraction.address, ethers.utils.parseEther("25"), 
-                wiainitai.address, ethers.utils.parseEther("5"), 
-                wiainitai.address, ethers.utils.parseEther("1")
-        );
-        await staking.deployed();
+        staking = await upgrades.deployProxy(StakingContract, [], { initializer: 'initialize' } );
+        await staking.deployed()
         console.log("staking address: ", staking.address)
 
         // const KOBA = await ethers.getContractFactory("KOBA");
@@ -75,6 +70,13 @@ describe("Test Token", async function () {
         await koba.unPause()
         await abstraction.setPaused()
         await wiainitai.setPaused()
+
+        await staking.setRewardTokenAddress(token.address)
+        await staking.allowCollectionToStake(abstraction.address, true)
+        await staking.allowCollectionToStake(wiainitai.address, true)
+
+        await staking.setRewardTokenPerBlock(abstraction.address, ethers.utils.parseEther("0.05"))
+        await staking.setRewardTokenPerBlock(wiainitai.address, ethers.utils.parseEther("0.01"))
     });
     
     it("mint abstraction and wiainitai features", async function () {
@@ -121,35 +123,35 @@ describe("Test Token", async function () {
     });
 
     
-    // it("staking features", async function () {
-    //     console.log("********************* staking individual collection **************************")
-    //     await token.transfer(staking.address, ethers.utils.parseEther("1000000000"))
-    //     await abstraction.connect(accounts[0]).setApprovalForAll(staking.address, true)
-    //     await wiainitai.connect(accounts[0]).setApprovalForAll(staking.address, true)
+    it("staking features", async function () {
+        console.log("********************* staking individual collection **************************")
+        await token.transfer(staking.address, ethers.utils.parseEther("1000000000"))
+        await abstraction.connect(accounts[0]).setApprovalForAll(staking.address, true)
+        await wiainitai.connect(accounts[0]).setApprovalForAll(staking.address, true)
 
 
-    //     await staking.connect(accounts[0]).stake(abstraction.address, [0, 2])
+        await staking.connect(accounts[0]).stake(abstraction.address, [0, 2])
         
-    //     await network.provider.send("evm_increaseTime", [86400 * 1])
-    //     await network.provider.send("evm_mine")
+        await network.provider.send("evm_increaseTime", [86400 * 1])
+        await network.provider.send("evm_mine")
 
 
-    //     console.log("account 0 staking info: ", await staking.getStakingInfo(abstraction.address, accounts[0].address))
+        console.log("account 0 staking info: ", await staking.getStakingInfo(abstraction.address, accounts[0].address))
 
-    //     // await staking.connect(accounts[0]).unstake(abstraction.address, [0, 2])
-    //     await staking.connect(accounts[0]).claimRewards(abstraction.address)
-    //     // console.log("account 0 reward amount: ", ethers.utils.formatEther(await token.balanceOf(accounts[0].address)))
-    //     // console.log("account 0 abstraction amount: ", await abstraction.balanceOf(accounts[0].address))
+        // await staking.connect(accounts[0]).unstake(abstraction.address, [0, 2])
+        await staking.connect(accounts[0]).claimRewards(abstraction.address)
+        // console.log("account 0 reward amount: ", ethers.utils.formatEther(await token.balanceOf(accounts[0].address)))
+        // console.log("account 0 abstraction amount: ", await abstraction.balanceOf(accounts[0].address))
 
-    //     console.log("account 0 staking info: ", await staking.getStakingInfo(abstraction.address, accounts[0].address))
+        console.log("account 0 staking info: ", await staking.getStakingInfo(abstraction.address, accounts[0].address))
 
-    //     await network.provider.send("evm_increaseTime", [86400 * 2])
-    //     await network.provider.send("evm_mine")
+        await network.provider.send("evm_increaseTime", [86400 * 2])
+        await network.provider.send("evm_mine")
 
-    //     await staking.connect(accounts[0]).unStake(abstraction.address, [0, 2])
+        await staking.connect(accounts[0]).unStake(abstraction.address, [0, 2])
 
-    //     console.log("account 0 staking info: ", await staking.getStakingInfo(abstraction.address, accounts[0].address))
-    // });    
+        console.log("account 0 staking info: ", await staking.getStakingInfo(abstraction.address, accounts[0].address))
+    });    
 
     
     // it("staking features", async function () {
