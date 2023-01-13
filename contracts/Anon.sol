@@ -2,12 +2,12 @@
 
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
-contract ANON is OwnableUpgradeable, ERC721Upgradeable {  
+contract ANON is Ownable, ERC721 {  
     using Strings for uint256;
     
     string private _baseURIextended;
@@ -16,11 +16,9 @@ contract ANON is OwnableUpgradeable, ERC721Upgradeable {
 
     address public constant burnAddress = 0x000000000000000000000000000000000000dEaD;
 
-    function initialize () public initializer {
-        __Ownable_init();
-        __ERC721_init("ANON by ANON", "ANON");
-
+    constructor(address _koba) ERC721("ANON by ANON", "ANON") {
         pauseMint = true;
+        koba = IERC721(_koba);
     }
 
     function setBaseURI(string calldata baseURI_) external onlyOwner {
