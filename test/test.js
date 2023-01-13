@@ -36,15 +36,15 @@ describe("Test Token", async function () {
         await koba.deployed();
         console.log("koba address: ", koba.address)
 
-        // const ANON = await ethers.getContractFactory("ANON");
-        // anon = await upgrades.deployProxy(ANON, [], { initializer: 'initialize' } );
-        // await anon.deployed();
-        // console.log("anon address: ", anon.address)
-        
         const ANON = await ethers.getContractFactory("ANON");
-        anon = await ANON.deploy(koba.address);
+        anon = await upgrades.deployProxy(ANON, [], { initializer: 'initialize' } );
         await anon.deployed();
         console.log("anon address: ", anon.address)
+        
+        // const ANON = await ethers.getContractFactory("ANON");
+        // anon = await ANON.deploy(koba.address);
+        // await anon.deployed();
+        // console.log("anon address: ", anon.address)
 
         // const StakingContract = await ethers.getContractFactory("StakingContract");
         // staking = await upgrades.deployProxy(StakingContract, [], { initializer: 'initialize' } );
@@ -75,6 +75,7 @@ describe("Test Token", async function () {
         await wiainitai.setPaused()
         await koba.unPause()
         await anon.setPaused()
+        await anon.setKobaAddress(koba.address)
 
         await staking.setRewardTokenAddress(token.address)
         await staking.allowCollectionToStake(abstraction.address, true)
