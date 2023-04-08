@@ -4,7 +4,7 @@
 // You can also run a script with `npx hardhat run <script>`. If you do that, Hardhat
 // will compile your contracts, add the Hardhat Runtime Environment's members to the
 // global scope, and execute the script.
-const hre = require("hardhat");
+const {hre, ethers} = require("hardhat");
 
 async function main() {
   // const AnonToken = await ethers.getContractFactory("AnonToken");
@@ -12,10 +12,27 @@ async function main() {
   // await token.deployed();
   // console.log("token address: ", token.address)
 
-  // const Abstractionbyanon = await ethers.getContractFactory("Abstractionbyanon");
-  // abstraction = await Abstractionbyanon.deploy();
-  // await abstraction.deployed();
-  // console.log("abstraction address: ", abstraction.address)
+  // const Mecha = await ethers.getContractFactory("Mecha");
+  // let mecha = await Mecha.deploy();
+  // await mecha.deployed();
+  // console.log("mecha address: ", mecha.address)
+
+  // const Marketplace = await ethers.getContractFactory("Marketplace");
+  // anon = await upgrades.deployProxy(Marketplace, [], { initializer: 'initialize' } );
+  // await anon.deployed();
+  // console.log("anon address: ", anon.address)
+
+  
+  const proxy = '0xc61d09828eDADfE650eA2d9266581154bf69a91e'
+  const Marketplace = await ethers.getContractFactory("Marketplace");
+  voting = await upgrades.upgradeProxy(proxy, Marketplace);
+  await voting.deployed();
+  console.log("voting address: ", voting.address)
+
+  // const BabyBoss = await ethers.getContractFactory("Marketplace");
+  // let babyBoss = await BabyBoss.deploy();
+  // await babyBoss.deployed();
+  // console.log("BabyBoss address: ", babyBoss.address)
 
   // const Whoiamisnotimportanttheartis = await ethers.getContractFactory("Whoiamisnotimportanttheartis");
   // wiainitai = await Whoiamisnotimportanttheartis.deploy();
@@ -59,11 +76,11 @@ async function main() {
   // await voting.setWiainitai('0x49ecC5eBF5d4c77a54dF45f996c410A01A4D63f9', 2)
   // await voting.setAnon('0xDcFBf478FA3Af8f9BD53aCa1FB7505FcE87b7AF7', 1)
 
-  const proxy = '0x552ab3a362b2D7fC4255019967100E6E201134fa'
-  const Voting = await ethers.getContractFactory("Voting");
-  voting = await upgrades.upgradeProxy(proxy, Voting);
-  await voting.deployed();
-  console.log("voting address: ", voting.address)
+  // const proxy = '0x552ab3a362b2D7fC4255019967100E6E201134fa'
+  // const Voting = await ethers.getContractFactory("Voting");
+  // voting = await upgrades.upgradeProxy(proxy, Voting);
+  // await voting.deployed();
+  // console.log("voting address: ", voting.address)
 
 }
 
